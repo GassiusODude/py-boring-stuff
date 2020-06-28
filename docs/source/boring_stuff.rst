@@ -1,10 +1,13 @@
 boring\_stuff package
 =====================
 
-.. automodule:: boring_stuff
-    :members:
-    :undoc-members:
-    :show-inheritance:
+Subpackages
+-----------
+
+.. toctree::
+
+    boring_stuff.parser
+    boring_stuff.projects
 
 Submodules
 ----------
@@ -18,3 +21,10 @@ boring\_stuff.setter module
     :show-inheritance:
 
 
+Module contents
+---------------
+
+.. automodule:: boring_stuff
+    :members:
+    :undoc-members:
+    :show-inheritance:
