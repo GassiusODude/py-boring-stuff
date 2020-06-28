@@ -12,7 +12,7 @@ import re
 """Regular expression for 'class signature"""
 RE_CLASS = re.compile(r"class ([\w\d]+)(\([\w\d]+\))?\:[\n]")
 RE_CLASS_FUNC = re.compile(r"    def ([\w\d]+)[\(]([\w\d\,\s]+)[\)\:]")
-RE_FUNC = re.compile(r"def ([\w\d]+)[\(]([\w\d\,\s]+)[\)\:]")
+RE_FUNC = re.compile(r"def ([\w\d]+)[\(]([\w\d\,\=\s]+)[\)\:]")
 RE_PARAMS = re.compile(r"([\w\d]+)[\,\s]*")
 
 def parse_functions(txt, class_method=True):
@@ -74,7 +74,7 @@ def parse_functions(txt, class_method=True):
         ]))
     return func_list
 
-def parse_file(filename):
+def parse_file(filename, base_name=None):
     """Parse a python file
 
     Scans for classes and
@@ -92,11 +92,25 @@ def parse_file(filename):
         name : str
         class_list : list (list of class specs)
         methods : list (list of function specs)
+
+    base_name : str or None
+        If provided, the name of the module will
+        follow base_name + "." + file_name.
     """
     # ------------------  initialize  variables  ------------------------
-    mod_name = filename[:-3]    # drop .py
-    mod_name = mod_name.replace(".", "_")
-    mod_name = mod_name.replace("/", "_")
+    # get file path and remove the directory
+    full_path = os.path.abspath(filename)
+    base = full_path[full_path.rfind("/") + 1:-3]   # drop ".py"
+
+    if base_name is None:
+        base_name = ""
+        mod_name = base
+    else:
+        mod_name = base_name + "." + base
+
+
+    #mod_name = mod_name.replace(".", "_")
+    #mod_name = mod_name.replace("/", "_")
     module = OrderedDict([
         ["type", "module"],
         ["name", mod_name],

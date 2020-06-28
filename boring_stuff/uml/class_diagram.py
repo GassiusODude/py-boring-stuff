@@ -40,7 +40,70 @@ def creator_note(out_file):
     out_file.write("%s\n"%time.ctime())
     out_file.write("end note\n\n")
 
-def write_class_diagram(module, output="/tmp/gen.wsd"):
+def write_package(package, file_out):
+
+    file_out.write("package %s {\n"%package.get("name") )
+    for module in package.get("modules"):
+        write_module(module, file_out)
+
+    for subpackage in package.get("subpackages"):
+
+        write_package(subpackage, file_out)
+    file_out.write("}\n")
+
+def write_module(module, file_out):
+    # ignore empty modules (like __init__.py)
+    if not(module.get("class_list") or module.get("methods")):
+        return
+
+    # encompass class with module
+    module_name = str(module.get("name", "module_name"))
+
+    class_list = module.get("class_list", [])
+    if not class_list:
+        if module.get("methods"):
+            class_spec = {
+                "type":"class",
+                "name":module.get("name"),
+                "methods": module.get("methods"),
+            }
+            class_list = [class_spec]
+
+    # ------------------  write classes  ----------------------------
+    list_ext = []
+    for class_spec in class_list:
+        write_class(class_spec, file_out)
+
+        # check parent and perhap update list_ext
+        parent = class_spec.get("parent")
+        if parent:
+            list_ext.append("{}{}{}".format(
+                parent,
+                CONNECTION.get("EXTENSION"),
+                class_spec.get("name")))
+
+    # draw links between extensions
+    for ext in list_ext:
+        file_out.write(ext + "\n")
+
+
+
+def write_class(class_spec, file_out):
+    file_out.write("\nclass %s {\n"%class_spec.get("name"))
+    for method in class_spec.get("methods", []):
+        write_function(method, file_out)
+    file_out.write("}\n") # write complete class
+
+def write_function(method_spec, file_out):
+    param_str = ", ".join(method_spec.get("params",[]))
+
+    file_out.write(" "*4 + "{} {} {}({})\n".format(
+        ACCESS[method_spec.get("access").upper()],
+        "void",
+        method_spec.get("name"),
+        param_str))
+
+def write_class_diagram(package, output="/tmp/gen.wsd"):
     """Write a class diagram
 
     Draw the class diagram provided the description from
@@ -48,30 +111,13 @@ def write_class_diagram(module, output="/tmp/gen.wsd"):
 
     Parameters
     ----------
-    class_list : list
-        List of class specification in dictionary format.
-        Expected fields are
-            type: class
-            name: $NAME
-            attributes: list of attributes
-            methods: list of methods
+    package : dict
+        Dictionary with field of subpackages and modules
 
     output : str
         The output file path for the WSD file.
     """
     with open(output, "w") as file_out:
-        # -------------------  initialize variables  ------------------------
-
-        def write_class(class_spec):
-            file_out.write("\nclass %s {\n"%class_spec.get("name"))
-            for method in class_spec.get("methods", []):
-                param_str = ", ".join(method.get("params",[]))
-
-                file_out.write(" "*4 + "{} {} {}({})\n".format(
-                    ACCESS[method.get("access").upper()],
-                    "void", method.get("name"), param_str))
-            file_out.write("}\n") # write complete class
-
         # -------------------  write WSD UML file  --------------------------
         # initialize UML
         file_out.write("@startuml\n")
@@ -79,39 +125,10 @@ def write_class_diagram(module, output="/tmp/gen.wsd"):
         # add a note
         creator_note(file_out)
 
-        # encompass class with module
-        module_name = str(module.get("name", "module_name"))
-        file_out.write("package %s {\n"%module_name )
+        # -------------------  write module  --------------------------------
+        write_package(package, file_out)
 
-        class_list = module.get("class_list", [])
-        if not class_list:
-            class_spec = {
-                "type":"class",
-                "name":module.get("name") + "DEFAULT",
-                "methods": module.get("methods"),
-            }
-            class_list = [class_spec]
-
-        # ------------------  write classes  ----------------------------
-        list_ext = []
-        for class_spec in class_list:
-            write_class(class_spec)
-
-            # check parent and perhap update list_ext
-            parent = class_spec.get("parent")
-            if parent:
-                list_ext.append("{}{}{}".format(
-                    parent,
-                    CONNECTION.get("EXTENSION"),
-                    class_spec.get("name")))
-
-        # draw links between extensions
-        for ext in list_ext:
-            file_out.write(ext + "\n")
-
-        # -------------------  finalize uml  ----------------------------
-        # end package
-        file_out.write("}\n")
 
         # finalize UML
         file_out.write("@enduml\n")
+
