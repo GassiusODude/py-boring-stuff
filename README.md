@@ -2,9 +2,11 @@
 
 This project contains some functionality that I commonly use.
 
-| Module | Description |
+| Packages | Description |
 | :-: | :- |
-| setter.py | Decorator for executing param testing for set methods |
+| Class Helper | Decorator for executing param testing for set methods |
+| Parser | Parse and map Python modules |
+| UML | Generation code for UML |
 
 ## Installation
 

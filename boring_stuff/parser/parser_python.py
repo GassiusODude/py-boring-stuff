@@ -1,20 +1,18 @@
 #!/usr/bin/env python
+"""Python Parser Module
+
+This module can be applied to scan a Python module and map
+the classes and functions within.
+"""
 from collections import namedtuple, OrderedDict
 import os
 from pprint import pprint
 import re
 
-CLASS_TUPLE = namedtuple("Class", ["name", "extension", "functions"])
-
-RE_IMPORTS = re.compile(r"import ")
-
-# class ($CLASSNAME)($EXTENSION):\n($BODY)
+"""Regular expression for 'class signature"""
 RE_CLASS = re.compile(r"class ([\w\d]+)(\([\w\d]+\))?\:[\n]")
 RE_CLASS_FUNC = re.compile(r"    def ([\w\d]+)[\(]([\w\d\,\s]+)[\)\:]")
 RE_FUNC = re.compile(r"def ([\w\d]+)[\(]([\w\d\,\s]+)[\)\:]")
-RE_TABBED = re.compile(r"(([ ]{4}.*)+\n+)+")
-RE_LINE = re.compile(r"[/w/d].*\n")
-RE_DOCSTRING = re.compile(r"[\"]{3}[^[\"]{3}]*[\"]{3}")
 RE_PARAMS = re.compile(r"([\w\d]+)[\,\s]*")
 
 def parse_functions(txt, class_method=True):
@@ -110,9 +108,9 @@ def parse_file(filename):
 
     with open(filename, 'r') as file_in:
         txt  = file_in.read()
-        import_matches = RE_IMPORTS.finditer(txt)
-        class_matches = RE_CLASS.finditer(txt)
 
+        # --------------------  detect classes  -----------------------------
+        class_matches = RE_CLASS.finditer(txt)
 
         for cls1 in class_matches:
             # update last class with class methods
