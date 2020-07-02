@@ -6,20 +6,10 @@ Subpackages
 
 .. toctree::
 
+    boring_stuff.class_helper
     boring_stuff.parser
     boring_stuff.projects
-
-Submodules
-----------
-
-boring\_stuff.setter module
----------------------------
-
-.. automodule:: boring_stuff.setter
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
+    boring_stuff.uml
 
 Module contents
 ---------------

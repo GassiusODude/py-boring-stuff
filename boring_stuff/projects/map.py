@@ -52,7 +52,17 @@ def map_python(in_dir, base_name=None):
     return c_package
 
 if __name__ == "__main__":
-    tmp = map_python("..")
+    # --------------------------  parse commands  ---------------------------
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("project_dir", help="Project directory")
+    parser.add_argument("output", default="/tmp/class_diagram.wsd",
+        help="Location to generate the class diagram")
+    args = parser.parse_args()
+
+
+    tmp = map_python(args.project_dir)
+
 
     from boring_stuff.uml.class_diagram import write_class_diagram
-    write_class_diagram(tmp)
+    write_class_diagram(tmp, output=args.output)
