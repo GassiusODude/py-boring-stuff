@@ -2,7 +2,7 @@
 from collections import OrderedDict
 import os
 from boring_stuff.parser.parser_python import parse_file
-
+IGNORE_DIRS = ["__pycache__"]
 def map_python(in_dir, base_name=None):
     """Map a python package
 
@@ -36,7 +36,12 @@ def map_python(in_dir, base_name=None):
     for tmp_file in files:
         c_file = c_dir + "/" + tmp_file
         if os.path.isdir(c_file):
-            # directory
+            # -----------------------  directory  ---------------------------
+            # if in IGNORE_DIRS, skip
+            if tmp_file in IGNORE_DIRS:
+                continue
+
+            # recursively run
             c_package["subpackages"].append(
                 map_python(c_file, base_name=base_name+"."+tmp_file)
             )

@@ -1,5 +1,5 @@
 import pytest
-from boring_stuff.setter import Setter
+from boring_stuff.class_helper.setter import Setter
 SEXES = ["Male", "Female"]
 class Person(object):
     def __init__(self, name="Bob", age=1, sex="Male"):
