@@ -4,9 +4,27 @@ import inspect
 from pprint import pprint
 
 def map_module(mod):
+    """Map Module
+
+    Parameters
+    ----------
+    mod : Python module
+        Module to map.
+
+    Returns
+    -------
+    c_package : dict
+        Dictionary describing the interconnecting classes and packages
+    """
+    # scan for submodules
     mod_dict = dict(inspect.getmembers(mod, inspect.ismodule))
+
+    # scan for classes
     class_dict = dict(inspect.getmembers(mod, inspect.isclass))
+
+    # scan for functions
     method_dict = dict(inspect.getmembers(mod, inspect.isfunction))
+
     if len(class_dict) > 0 or len(method_dict) > 0:
         c_package = OrderedDict([
             ["type", "module"],
@@ -27,7 +45,8 @@ def map_module(mod):
                 map_function(method_dict[c_method])
             )
 
-    elif mod_dict:
+    #elif mod_dict:
+    else:
         c_package = OrderedDict([
             ["type", "package"],
             ["name", mod.__name__],
@@ -37,7 +56,7 @@ def map_module(mod):
         ])
         for c_mod in mod_dict:
             try:
-                if mod_dict[c_mod].__package__ and \
+                if mod_dict[c_mod].__package__ is None or \
                     mod.__name__ in mod_dict[c_mod].__package__:
                     tmp_mod = map_module(mod_dict[c_mod])
                     if tmp_mod["type"] == "package":
@@ -52,6 +71,16 @@ def map_module(mod):
     return c_package
 
 def map_class(cls):
+    """Map a class
+
+    Scans the class for methods and functions.  Track the parent class if
+    available.
+
+    Parameters
+    ----------
+    cls : class
+        The class to map.
+    """
     # ------------------------  get class methods  --------------------------
     methods = dict(inspect.getmembers(cls, inspect.ismethod))
     method_list = []
@@ -65,7 +94,6 @@ def map_class(cls):
     for func in funcs:
         func_list.append(map_function(funcs[func]))
 
-
     # -------------------------  identify parent class  ---------------------
     try:
         parent = cls.__bases__[0].__name__
@@ -75,13 +103,11 @@ def map_class(cls):
         parent = None
 
     # --------------------------  initialize class spec  --------------------
-
     cls_spec = OrderedDict([
         ["type","class"],
         ["name", cls.__name__],
         ["parent", parent],
-        #["signature_loc", (cls1.start(), cls1.end())],
-        ["attributes", []],
+        ["attributes", []],#FIXME: how to identify attributes?
         ["methods", method_list],
         ["functions", func_list],
     ])

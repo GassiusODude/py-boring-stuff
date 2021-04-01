@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Set Method Helper
 
 This module provides a class decorator to help set up

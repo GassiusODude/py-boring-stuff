@@ -1,1 +1,1 @@
-from . import setter
+from boring_stuff.class_helper import setter
