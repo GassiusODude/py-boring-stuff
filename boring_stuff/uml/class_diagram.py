@@ -143,6 +143,14 @@ def write_class(class_spec, file_out, n_tab=0):
     # -----------------------  write method signatures  ---------------------
     for method in class_spec.get("methods", []):
         write_function(method, file_out, n_tab + 1)
+
+    # -----------------------  write function signatures  ---------------------
+    list_funcs = class_spec.get("functions", [])
+    if list_funcs:
+        file_out.write("-- static methods --\n")
+        for func in list_funcs:
+            write_function(func, file_out, n_tab + 1)
+
     file_out.write(n_tab * TAB + "}\n") # write complete class
 
 def write_function(method_spec, file_out, n_tab=1):
