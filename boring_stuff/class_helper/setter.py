@@ -18,6 +18,8 @@ Enumeration limitation
 ... def set_coin_toss(self, toss):
 ...     self.toss = toss
 """
+
+
 class Setter(object):
     """Setter error checking decorator
 
@@ -48,22 +50,24 @@ class Setter(object):
             if self.dtype is not None:
                 try:
                     value = self.dtype(value)
-                except:
-                    raise TypeError("Expecting %s but got %s"\
-                        %(self.dtype, type(value)))
+                except Exception as e:
+                    print(e)
+                    raise TypeError(
+                        "Expecting %s but got %s"
+                        % (self.dtype, type(value)))
 
             # check min
             if self.min is not None:
-                assert value >= self.min, "Minumum is %s"%str(self.min)
+                assert value >= self.min, "Minumum is %s" % str(self.min)
 
             # check max
             if self.max is not None:
-                assert value <= self.max, "Maximum is %s"%str(self.max)
+                assert value <= self.max, "Maximum is %s" % str(self.max)
 
             # check enum
             if self.enum is not None:
                 assert value in self.enum, \
-                    ValueError("Expecting in %s"%self.enum)
+                    ValueError("Expecting in %s" % self.enum)
 
             # ------------------  run function  -----------------------------
             return func(obj, value)
