@@ -91,7 +91,7 @@ def write_package(package, file_out, n_tab=0):
 
     # opening of package
     file_out.write(
-        TAB * n_tab + \
+        TAB * n_tab +
         "package %s {\n" % package.get("name")
     )
 
@@ -123,7 +123,6 @@ def write_module(module, file_out, n_tab=0):
     n_tab : int
         Number of tabs to indent
     """
-
     class_list = module.get("class_list", [])
     func_list = module.get("methods", [])
     var_list = module.get("variables", [])
@@ -137,14 +136,14 @@ def write_module(module, file_out, n_tab=0):
 
     if len(var_list) > 0 or len(func_list) > 0:
         # write a class to describe the variables and functions
-        file_out.write("\n%sclass %s {\n" % \
+        file_out.write(
+            "\n%sclass %s {\n" %
             ((n_tab + 1) * TAB, module.get("name") + ".module")
         )
 
         # write variables
         for var_spec in var_list:
             write_variable(var_spec, file_out, n_tab+2)
-
 
         # write functions
         for func_spec in func_list:
@@ -206,18 +205,27 @@ def write_class(class_spec, file_out, n_tab=0):
 
     # TODO: write attributes/properties of the class
     #       Currently detection of the internal properties has not been done
+    att_list = class_spec.get("attributes", [])
+    for att in att_list:
+        write_variable(att, file_out, n_tab + 1)
 
     # -----------------------  write method signatures  ---------------------
     for method in class_spec.get("methods", []):
         write_function(method, file_out, n_tab + 1)
 
-    # -----------------------  write function signatures  ---------------------
-    list_funcs = class_spec.get("functions", [])
-    if list_funcs:
+    # -----------------------  write static function  -----------------------
+    s_funcs = class_spec.get("staticmethods", [])
+    if s_funcs:
         file_out.write((n_tab + 1) * TAB + "-- static methods --\n")
-        for func in list_funcs:
+        for func in s_funcs:
             write_function(func, file_out, n_tab + 1)
 
+    # -----------------------  write class function  ------------------------
+    c_funcs = class_spec.get("classmethods", [])
+    if c_funcs:
+        file_out.write((n_tab + 1) * TAB + "-- class methods --\n")
+        for func in c_funcs:
+            write_function(func, file_out, n_tab + 1)
     file_out.write(n_tab * TAB + "}\n")  # write complete class
 
 
@@ -255,17 +263,17 @@ def write_function(method_spec, file_out, n_tab=1):
 
 
 def write_variable(var_spec, file_out, n_tab):
+    if var_spec:
+        file_out.write(TAB*n_tab + "{} {}:{}\n".format(
+            # public(+), protected(#), private(-)
+            ACCESS[var_spec.get("access").upper()],
 
-    file_out.write(TAB*n_tab + "{} {}:{}\n".format(
-        # public(+), protected(#), private(-)
-        ACCESS[var_spec.get("access").upper()],
+            # name of the method
+            var_spec.get("name"),
 
-        # name of the method
-        var_spec.get("name"),
-
-        # parameter
-        var_spec.get("type")
-    ))
+            # parameter
+            var_spec.get("type")
+        ))
 
 
 def write_class_diagram(package, output="/tmp/gen.wsd"):

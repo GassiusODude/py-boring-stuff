@@ -54,3 +54,34 @@ def test_pure_package():
     ]
     for sub_mod in bs_mod["subpackages"]:
         assert sub_mod["name"] in subpackages
+
+
+def test_class_mapping():
+    class MyClass(object):
+
+        var1 = 1
+
+        def __init__(self):
+            pass
+
+        @classmethod
+        def print_name(cls, name):
+            print(name)
+
+        @staticmethod
+        def display():
+            print("Hello")
+
+    cls_spec = MWI.map_class(MyClass)
+    print(cls_spec)
+    static_methods = ["display"]
+    for k in cls_spec["staticmethods"]:
+        assert k["name"] in static_methods
+
+    class_methods = ["print_name"]
+    for k in cls_spec["classmethods"]:
+        assert k["name"] in class_methods
+
+    var_list = ["var1"]
+    for v in cls_spec["attributes"]:
+        assert v["name"] in var_list
