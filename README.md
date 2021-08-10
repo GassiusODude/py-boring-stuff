@@ -48,3 +48,7 @@ $ pip3 install pytest --user
 # run all tests in test directory
 $ python3 -m pytest test
 ~~~
+
+## Use Cases
+
+1. [Map Library and Create Class Diagram](docs/map_and_class_diagram.md)

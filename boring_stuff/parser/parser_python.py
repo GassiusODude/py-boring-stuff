@@ -4,16 +4,19 @@
 This module can be applied to scan a Python module and map
 the classes and functions within.
 """
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 import os
-from pprint import pprint
 import re
+import logging
+
+logger = logging.getLogger("boring_stuff.parser.parser_python")
 
 """Regular expression for 'class signature"""
 RE_CLASS = re.compile(r"class ([\w\d]+)(\([\w\d]+\))?\:[\n]")
 RE_CLASS_FUNC = re.compile(r"    def ([\w\d]+)[\(]([\w\d\,\s]+)[\)\:]")
 RE_FUNC = re.compile(r"def ([\w\d]+)[\(]([\w\d\,\=\s]+)[\)\:]")
 RE_PARAMS = re.compile(r"([\w\d]+)[\,\s]*")
+
 
 def parse_functions(txt, class_method=True):
     """parse_function
@@ -74,6 +77,7 @@ def parse_functions(txt, class_method=True):
         ]))
     return func_list
 
+
 def parse_file(filename, base_name=None):
     """Parse a python file
 
@@ -108,9 +112,8 @@ def parse_file(filename, base_name=None):
     else:
         mod_name = base_name + "." + base
 
-
-    #mod_name = mod_name.replace(".", "_")
-    #mod_name = mod_name.replace("/", "_")
+    # mod_name = mod_name.replace(".", "_")
+    # mod_name = mod_name.replace("/", "_")
     module = OrderedDict([
         ["type", "module"],
         ["name", mod_name],
@@ -121,7 +124,7 @@ def parse_file(filename, base_name=None):
     last_class_loc = None
 
     with open(filename, 'r') as file_in:
-        txt  = file_in.read()
+        txt = file_in.read()
 
         # --------------------  detect classes  -----------------------------
         class_matches = RE_CLASS.finditer(txt)
@@ -129,19 +132,20 @@ def parse_file(filename, base_name=None):
         for cls1 in class_matches:
             # update last class with class methods
             if last_class_loc:
-                class_list[-1]["methods"] = parse_functions(\
+                class_list[-1]["methods"] = parse_functions(
                     txt[last_class_loc[1]:cls1.start()], True)
 
             # get parent, or fill with None
             try:
                 parent = cls1.group(2)
-                parent = parent[1:-1] # trim parenthesis
-            except:
+                parent = parent[1:-1]  # trim parenthesis
+            except Exception as e:
+                logger.warn("parse_file get parent failed with %s" % str(e))
                 parent = None
 
             # append class description
             class_list.append(OrderedDict([
-                ["type","class"],
+                ["type", "class"],
                 ["name", cls1.group(1)], ["parent", parent],
                 ["signature_loc", (cls1.start(), cls1.end())],
                 ["attributes", []], ["methods", []],
@@ -160,4 +164,5 @@ def parse_file(filename, base_name=None):
         else:
             # module with functions only
             module["methods"] = parse_functions(txt, False)
+
     return module

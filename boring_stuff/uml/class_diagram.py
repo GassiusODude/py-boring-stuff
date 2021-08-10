@@ -22,6 +22,9 @@ Now draw with class diagram (Plantuml format)
 # import libraries
 import time
 import numpy as np
+import logging
+logger = logging.getLogger("boring_stuff.uml.class_diagram")
+
 CONNECTION = {
     "EXTENSION": " <|-down- ",
     "COMPOSITION": " *-down- ",
@@ -85,6 +88,7 @@ def write_package(package, file_out, n_tab=0):
     n_tab : int
         Number of tabs to indent
     """
+    logger.info("write_package(%s)" % package.get("name"))
     if package["type"] == "module":
         write_module(package, file_out, n_tab)
         return
@@ -123,6 +127,7 @@ def write_module(module, file_out, n_tab=0):
     n_tab : int
         Number of tabs to indent
     """
+    logger.info("write_module(%s)" % module.get("name"))
     class_list = module.get("class_list", [])
     func_list = module.get("methods", [])
     var_list = module.get("variables", [])
@@ -132,7 +137,7 @@ def write_module(module, file_out, n_tab=0):
         return
 
     # write module
-    file_out.write("\n%spackage %s {\n" % (n_tab*TAB, module.get("name")))
+    file_out.write("\n%spackage %s {\n" % (n_tab * TAB, module.get("name")))
 
     if len(var_list) > 0 or len(func_list) > 0:
         # write a class to describe the variables and functions
@@ -143,11 +148,11 @@ def write_module(module, file_out, n_tab=0):
 
         # write variables
         for var_spec in var_list:
-            write_variable(var_spec, file_out, n_tab+2)
+            write_variable(var_spec, file_out, n_tab + 2)
 
         # write functions
         for func_spec in func_list:
-            write_function(func_spec, file_out, n_tab+2)
+            write_function(func_spec, file_out, n_tab + 2)
 
         # finish this class
         file_out.write((n_tab + 1) * TAB + "}\n")
@@ -161,11 +166,13 @@ def write_module(module, file_out, n_tab=0):
         parent_list = class_spec.get("parent")
         if parent_list:
             if np.isscalar(parent_list):
+                # single item
                 list_ext.append("{}{}{}".format(
                     parent_list,
                     CONNECTION.get("EXTENSION"),
                     class_spec.get("name")))
             else:
+                # if list
                 for parent in parent_list:
                     list_ext.append("{}{}{}".format(
                         parent,
@@ -203,11 +210,13 @@ def write_class(class_spec, file_out, n_tab=0):
     """
     file_out.write("\n%sclass %s {\n" % (n_tab*TAB, class_spec.get("name")))
 
-    # TODO: write attributes/properties of the class
-    #       Currently detection of the internal properties has not been done
+    # write attributes/properties of the class
     att_list = class_spec.get("attributes", [])
     for att in att_list:
         write_variable(att, file_out, n_tab + 1)
+        logger.debug(
+            "writing variable(%s) from class(%s)" %
+            (att["name"], class_spec["name"]))
 
     # -----------------------  write method signatures  ---------------------
     for method in class_spec.get("methods", []):
@@ -219,13 +228,19 @@ def write_class(class_spec, file_out, n_tab=0):
         file_out.write((n_tab + 1) * TAB + "-- static methods --\n")
         for func in s_funcs:
             write_function(func, file_out, n_tab + 1)
+            logger.debug(
+                "writing staticmethod: %s" % str(func["name"]))
 
     # -----------------------  write class function  ------------------------
     c_funcs = class_spec.get("classmethods", [])
     if c_funcs:
+
         file_out.write((n_tab + 1) * TAB + "-- class methods --\n")
         for func in c_funcs:
             write_function(func, file_out, n_tab + 1)
+            logger.debug(
+                "writing classmethod: %s" % str(func["name"]))
+
     file_out.write(n_tab * TAB + "}\n")  # write complete class
 
 
@@ -263,6 +278,19 @@ def write_function(method_spec, file_out, n_tab=1):
 
 
 def write_variable(var_spec, file_out, n_tab):
+    """Write variable
+
+    Parameters
+    ----------
+    var_spec : dict
+        The variable spec with fields 'name', 'type', 'access"
+
+    file_out : file
+        File handle of the output file
+
+    n_tab : int
+        Number of tabs
+    """
     if var_spec:
         file_out.write(TAB*n_tab + "{} {}:{}\n".format(
             # public(+), protected(#), private(-)
@@ -290,6 +318,7 @@ def write_class_diagram(package, output="/tmp/gen.wsd"):
     output : str
         The output file path for the WSD file.
     """
+    logger.info("write_class_diagram to %s" % output)
     with open(output, "w") as file_out:
         # -------------------  write WSD UML file  --------------------------
         # initialize UML
