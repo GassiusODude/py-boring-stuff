@@ -58,7 +58,7 @@ def map_module(mod):
     module_dict = {}
     class_dict = {}
     func_dict = {}
-    dependencies_dict = {}
+    dependency_list = []
     variable_list = []
 
     # ----------------------  inspect current  ------------------------------
@@ -78,7 +78,7 @@ def map_module(mod):
                 module_dict[member[1].__name__] = member[1]
             else:
                 # external library...an import
-                dependencies_dict[member[1].__name__] = member[1]
+                dependency_list.append([name, member[1].__name__])
 
         elif inspect.isfunction(member[1]):
             if member[1].__module__ == name:
@@ -86,27 +86,29 @@ def map_module(mod):
                 func_dict[member[0]] = member[1]
             else:
                 # imported function
-                dependencies_dict[member[1].__module__] = \
-                    inspect.getmodule(member[1])
+                dependency_list.append([name, member[1].__name__])
 
         elif inspect.isclass(member[1]):
             if member[1].__module__ == name:
                 # member of this module
                 class_dict[member[0]] = member[1]
+
             else:
                 # imported class
-                dependencies_dict[member[1].__module__] = \
-                    inspect.getmodule(member[1])
+                dependency_list.append([name, member[1].__name__])
+
         else:
             if is_private(member[0]):
                 c_access = "private"
+
             else:
                 c_access = "public"
-                variable_list.append({
-                    "name": member[0],
-                    "type": type(member[1]),
-                    "access": c_access
-                })
+
+            variable_list.append({
+                "name": member[0],
+                "type": type(member[1]),
+                "access": c_access
+            })
 
     has_m = len(module_dict) > 0
     has_c = len(class_dict) > 0
@@ -122,7 +124,7 @@ def map_module(mod):
             "subpackages": [],
             "modules": [],
             "misc": [],
-            "dependencies": dependencies_dict
+            "dependencies": dependency_list
         }
         add_modules(c_package, module_dict)
 
@@ -132,10 +134,11 @@ def map_module(mod):
             "type": "module",
             "name": name,
             "subpackages": [],
+            "modules": [],
             "class_list": [],
             "methods": [],
             "variables": variable_list,
-            "dependencies": dependencies_dict
+            "dependencies": dependency_list
         }
         add_modules(c_package, module_dict)
         add_classes(c_package, class_dict)
@@ -176,7 +179,9 @@ def add_modules(c_package, mod_dict):
                 c_package["modules"].append(tmp_mod)
 
         except Exception as e:
-            logger.error("Caught exception in add_modules(): %s" % str(e))
+            logger.error(
+                "Caught exception(%s) in add_modules(%s)" %
+                (str(e), str(c_mod)))
 
 
 def add_classes(c_package, class_dict):
@@ -443,6 +448,8 @@ if __name__ == "__main__":
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="The log level")
     parser.add_argument("--log", default="", help="Log file")
+    parser.add_argument(
+        "--depend", action="store_true", help="Draw dependencies")
     args = parser.parse_args()
 
     # set log level
@@ -457,4 +464,4 @@ if __name__ == "__main__":
 
     # ---------------------  draw class diagram  ----------------------------
     from boring_stuff.uml.class_diagram import write_class_diagram
-    write_class_diagram(c_package, output=args.output)
+    write_class_diagram(c_package, output=args.output, draw_depend=args.depend)

@@ -29,6 +29,7 @@ CONNECTION = {
     "EXTENSION": " <|-down- ",
     "COMPOSITION": " *-down- ",
     "AGGREGRATION": " o-down- ",
+    "DEPENDS": " <|.down. ",
 }
 """Types of CONNECTION
 
@@ -36,6 +37,7 @@ Types
     AGGREGATION
     COMPOSITION
     EXTENSION: B extends A
+    DEPENDS: B depends on A
 """
 
 ACCESS = {
@@ -73,7 +75,7 @@ def creator_note(out_file):
     out_file.write("end note\n\n")
 
 
-def write_package(package, file_out, n_tab=0):
+def write_package(package, file_out, n_tab=0, tracker={}):
     """Write the package
 
     Parameters
@@ -87,11 +89,20 @@ def write_package(package, file_out, n_tab=0):
 
     n_tab : int
         Number of tabs to indent
+
+    tracker : dict
+        Dictionary to track values across all modules
     """
     logger.info("write_package(%s)" % package.get("name"))
     if package["type"] == "module":
-        write_module(package, file_out, n_tab)
+        write_module(package, file_out, n_tab, tracker=tracker)
         return
+
+    # append dependencies
+    dependency_list = package.get("dependencies", [])
+    d_list = tracker.get("dependencies", [])
+    d_list += dependency_list
+    tracker["dependencies"] = d_list
 
     # opening of package
     file_out.write(
@@ -102,18 +113,18 @@ def write_package(package, file_out, n_tab=0):
     modules = package.get("modules")
     if modules:
         for module in modules:
-            write_module(module, file_out, n_tab + 1)
+            write_module(module, file_out, n_tab + 1, tracker=tracker)
 
     subpackages = package.get("subpackages")
     if subpackages:
         for subpackage in subpackages:
-            write_package(subpackage, file_out, n_tab + 1)
+            write_package(subpackage, file_out, n_tab + 1, tracker=tracker)
 
     # close of package
     file_out.write(TAB * n_tab + "}\n")
 
 
-def write_module(module, file_out, n_tab=0):
+def write_module(module, file_out, n_tab=0, tracker={}):
     """Write the module as a package in the class diagram
 
     Parameters
@@ -126,8 +137,18 @@ def write_module(module, file_out, n_tab=0):
 
     n_tab : int
         Number of tabs to indent
+
+    tracker : dict
+        Tracker for global settings
     """
     logger.info("write_module(%s)" % module.get("name"))
+
+    # append dependencies
+    dependency_list = module.get("dependencies", [])
+    d_list = tracker.get("dependencies", [])
+    d_list += dependency_list
+    tracker["dependencies"] = d_list
+
     class_list = module.get("class_list", [])
     func_list = module.get("methods", [])
     var_list = module.get("variables", [])
@@ -138,6 +159,16 @@ def write_module(module, file_out, n_tab=0):
 
     # write module
     file_out.write("\n%spackage %s {\n" % (n_tab * TAB, module.get("name")))
+
+    modules = module.get("modules")
+    if modules:
+        for c_module in modules:
+            write_module(c_module, file_out, n_tab + 1, tracker=tracker)
+
+    subpackages = module.get("subpackages")
+    if subpackages:
+        for subpackage in subpackages:
+            write_package(subpackage, file_out, n_tab + 1, tracker=tracker)
 
     if len(var_list) > 0 or len(func_list) > 0:
         # write a class to describe the variables and functions
@@ -304,7 +335,7 @@ def write_variable(var_spec, file_out, n_tab):
         ))
 
 
-def write_class_diagram(package, output="/tmp/gen.wsd"):
+def write_class_diagram(package, output="/tmp/gen.wsd", draw_depend=False):
     """Write a class diagram
 
     Draw the class diagram provided the description from
@@ -317,8 +348,12 @@ def write_class_diagram(package, output="/tmp/gen.wsd"):
 
     output : str
         The output file path for the WSD file.
+
+    draw_depend : bool
+        If true, draw dependencies
     """
     logger.info("write_class_diagram to %s" % output)
+
     with open(output, "w") as file_out:
         # -------------------  write WSD UML file  --------------------------
         # initialize UML
@@ -328,7 +363,35 @@ def write_class_diagram(package, output="/tmp/gen.wsd"):
         creator_note(file_out)
 
         # -------------------  write module  --------------------------------
-        write_package(package, file_out)
+        tracker = {
+            "dependencies": []
+        }
+        write_package(package, file_out, tracker=tracker)
+        if draw_depend:
+            write_dependencies(tracker["dependencies"], file_out)
 
         # finalize UML
         file_out.write("@enduml\n")
+
+
+def write_dependencies(depend_list, file_out, n_tab=1):
+    """Write dependencies
+
+    Parameters
+    ----------
+    depend_list : list
+        List of tuples.  [module, dependency]
+
+    file_out : file
+        Output file
+
+    n_tab : int
+        Number of tabs to prepend
+    """
+    for depend_tuple in depend_list:
+        file_out.write("{}{}{}{}\n".format(
+            n_tab * TAB,
+            depend_tuple[1],
+            CONNECTION["DEPENDS"],
+            depend_tuple[0],
+        ))
