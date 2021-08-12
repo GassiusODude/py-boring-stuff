@@ -73,7 +73,7 @@ def map_module(mod):
 
             elif inspect.ismodule(member[1]):
                 # --------------------  a module type  ----------------------
-                if member[1].__name__ == name:
+                if member[1].__name__ == name and member[1] == mod:
                     # same module? avoid infinite recursion
                     logger.warning("Module (%s) references itself" % name)
                     continue
