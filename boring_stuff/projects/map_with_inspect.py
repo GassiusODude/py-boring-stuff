@@ -73,7 +73,12 @@ def map_module(mod):
 
             elif inspect.ismodule(member[1]):
                 # --------------------  a module type  ----------------------
-                if member[1].__name__[:len(name)] == name:
+                if member[1].__name__ == name:
+                    # same module? avoid infinite recursion
+                    logger.warning("Module (%s) references itself" % name)
+                    continue
+
+                elif member[1].__name__[:len(name)] == name:
                     # submodule
                     module_dict[member[1].__name__] = member[1]
                 else:
@@ -177,6 +182,7 @@ def add_modules(c_package, mod_dict):
     """
     for c_mod in mod_dict:
         try:
+            logger.debug("Add %s from %s" % (c_mod, c_package["name"]))
             tmp_mod = map_module(mod_dict[c_mod])
             if tmp_mod["type"] == "package":
                 c_package["subpackages"].append(tmp_mod)
