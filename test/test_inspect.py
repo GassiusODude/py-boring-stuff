@@ -11,20 +11,6 @@ import sys
 from boring_stuff.projects import map_with_inspect as MWI
 
 
-def test_class_map():
-    from boring_stuff.class_helper.setter import Setter
-    setter_dict = MWI.map_class(Setter)
-    print("Python version = ", sys.version)
-    print(setter_dict)
-
-    assert setter_dict["type"] == "class"
-    assert setter_dict["name"] == "Setter"
-
-    # check methods
-    methods = setter_dict["methods"]
-    assert len(methods) == 2, "Expecting methods __init__ and __call__"
-
-
 def test_module_with_class():
     from boring_stuff.class_helper import setter
     setter_mod = MWI.map_module(setter)
@@ -72,7 +58,7 @@ def test_class_mapping():
         def display():
             print("Hello")
 
-    cls_spec = MWI.map_class(MyClass)
+    cls_spec = MWI.map_class(MyClass, access_level=2)
     print(cls_spec)
     static_methods = ["display"]
     for k in cls_spec["staticmethods"]:

@@ -8,24 +8,23 @@ import sys
 logger = logging.getLogger("boring_stuff.projects.map_with_inspect")
 
 
-def is_private(name):
-    """Check if variable name infers that variable is private.
+def get_access(name):
+    """Get access based on name
 
-    Parameters
-    ----------
-    name : str
-        The name of the variable in question
-
-    Returns
-    -------
-    private : bool
-        True if it fits "__xxxxx__" format
+    In Python __var__ refers to a private access
+    _var refers to protected access
+    and var would refer to public access
     """
     assert isinstance(name, str), "Expecting name to be a string"
-    return len(name) > 4 and "__" == name[:2] and "__" == name[-2:]
+    if len(name) > 4 and "__" == name[:2] and "__" == name[-2:]:
+        return "PRIVATE"
+    elif len(name) > 1 and name[0] == "_":
+        return "PROTECTED"
+    else:
+        return "PUBLIC"
 
 
-def map_module(mod):
+def map_module(mod, access_level=0):
     """Map a module
 
     Use inspect to map the following:
@@ -42,6 +41,11 @@ def map_module(mod):
     ----------
     mod : module
         The module to be examined.
+
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
 
     Returns
     -------
@@ -67,8 +71,13 @@ def map_module(mod):
     for member in members:
         try:
             # member is a tuple
-            if member[0][:2] == "__" and member[0][-2:] == "__":
-                # ignore 'private' members
+            c_access = get_access(member[0])
+            if c_access == "PRIVATE" and access_level < 2:
+                # ignore 'private' member, ignore
+                continue
+
+            elif c_access == "PROTECTED" and access_level < 1:
+                # ignore protected
                 continue
 
             elif inspect.ismodule(member[1]):
@@ -103,12 +112,7 @@ def map_module(mod):
                     dependency_list.append([name, member[1].__name__])
 
             else:
-                if is_private(member[0]):
-                    c_access = "private"
-
-                else:
-                    c_access = "public"
-
+                c_access = get_access(member[0])
                 variable_list.append({
                     "name": member[0],
                     "type": type(member[1]),
@@ -134,7 +138,7 @@ def map_module(mod):
                 "misc": [],
                 "dependencies": dependency_list
             }
-            add_modules(c_package, module_dict)
+            add_modules(c_package, module_dict, access_level)
 
         else:
             # module with some form of variable/function/class
@@ -148,8 +152,8 @@ def map_module(mod):
                 "variables": variable_list,
                 "dependencies": dependency_list
             }
-            add_modules(c_package, module_dict)
-            add_classes(c_package, class_dict)
+            add_modules(c_package, module_dict, access_level)
+            add_classes(c_package, class_dict, access_level)
 
             for c_method in func_dict:
                 c_package["methods"].append(
@@ -161,7 +165,7 @@ def map_module(mod):
     return c_package
 
 
-def add_modules(c_package, mod_dict):
+def add_modules(c_package, mod_dict, access_level=0):
     """Add modules to c_package
 
     This uses map_module to dive deeper into detected moddules.
@@ -175,6 +179,11 @@ def add_modules(c_package, mod_dict):
         The current package from map_module.
         .. note:: This parameter is update by this function
 
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
+
     See Also
     --------
     map_module :
@@ -183,7 +192,7 @@ def add_modules(c_package, mod_dict):
     for c_mod in mod_dict:
         try:
             logger.debug("Add %s from %s" % (c_mod, c_package["name"]))
-            tmp_mod = map_module(mod_dict[c_mod])
+            tmp_mod = map_module(mod_dict[c_mod], access_level)
             if tmp_mod["type"] == "package":
                 c_package["subpackages"].append(tmp_mod)
             else:
@@ -195,7 +204,7 @@ def add_modules(c_package, mod_dict):
                 (str(e), str(c_mod)))
 
 
-def add_classes(c_package, class_dict):
+def add_classes(c_package, class_dict, access_level=0):
     """Add details about classes
 
     This function dives deeper into the package to
@@ -209,6 +218,11 @@ def add_classes(c_package, class_dict):
     class_dict : dict
         The classes found in map_module
 
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
+
     See Also
     ---------
     map_module :
@@ -220,7 +234,7 @@ def add_classes(c_package, class_dict):
     for c_class in class_dict:
         try:
             c_package["class_list"].append(
-                map_class(class_dict[c_class])
+                map_class(class_dict[c_class], access_level)
             )
         except Exception as e:
             logger.error("Exception caught in add_classes: %s" % str(e))
@@ -252,13 +266,18 @@ def get_parent(cls):
     return parent
 
 
-def map_class_python3(cls):
+def map_class_python3(cls, access_level=0):
     """Map class with Python3
 
     Parameters
     ----------
     cls : class
         The class being analyzed
+
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
 
     Returns
     -------
@@ -283,15 +302,27 @@ def map_class_python3(cls):
     ignore_fields = ["__class__", "__dict__", "__module__", "__weakref__"]
     for member in members:
         try:
+            c_access = get_access(member[0])
             if member[0] == "__init__":
                 cls_spec["methods"].append(map_function(member[1]))
+
+            elif c_access == "PRIVATE" and access_level < 2:
+                pass
+
+            elif c_access == "PROTECTED" and access_level < 1:
+                pass
 
             elif member[0] in obj_fields or member[0] in ignore_fields:
                 pass
 
             elif inspect.ismethod(member[1]):
                 # class method
-                cls_spec["classmethods"].append(map_function(member[1]))
+                c_func = map_function(member[1])
+                c_params = c_func["params"]
+                if len(c_params) > 0 and c_params[0] == "self":
+                    cls_spec["methods"].append(c_func)
+                else:
+                    cls_spec["classmethods"].append(c_func)
 
             elif inspect.isfunction(member[1]):
                 # class method
@@ -305,11 +336,8 @@ def map_class_python3(cls):
 
             elif inspect.isroutine(member[1]):
                 pass
+
             else:
-                if is_private(member[0]):
-                    c_access = "private"
-                else:
-                    c_access = "public"
                 cls_spec["attributes"].append({
                     "name": member[0],
                     "type": type(member[1]),
@@ -323,13 +351,18 @@ def map_class_python3(cls):
     return cls_spec
 
 
-def map_class_python2(cls):
+def map_class_python2(cls, access_level=0):
     """Map class with Python2
 
     Parameters
     ----------
     cls : class
         The class being analyzed
+
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
 
     Returns
     -------
@@ -355,8 +388,15 @@ def map_class_python2(cls):
 
     for member in members:
         try:
+            c_access = get_access(member[0])
             if member[0] == "__init__":
                 cls_spec["methods"].append(map_function(member[1]))
+
+            elif c_access == "PRIVATE" and access_level < 2:
+                pass
+
+            elif c_access == "PROTECTED" and access_level < 1:
+                pass
 
             elif member[0] in obj_fields or member[0] in ignore_fields:
                 pass
@@ -379,10 +419,6 @@ def map_class_python2(cls):
                 pass
 
             else:
-                if is_private(member[0]):
-                    c_access = "private"
-                else:
-                    c_access = "public"
                 cls_spec["attributes"].append({
                     "name": member[0],
                     "type": type(member[1]),
@@ -398,7 +434,7 @@ def map_class_python2(cls):
     return cls_spec
 
 
-def map_class(cls):
+def map_class(cls, access_level=0):
     """Map a class
 
     Scans the class for methods and functions.  Track the parent class if
@@ -408,11 +444,22 @@ def map_class(cls):
     ----------
     cls : class
         The class to map.
+
+    access_level : int
+        If 0, only track public
+        If 1, track up to protected
+        If 2, track private
+
+    Returns
+    -------
+    class_spec : dict
+        Dictionary describing the parent, attributes, methods,
+        staticmethods, and classmethods
     """
     if sys.version_info.major == 3:
-        return map_class_python3(cls)
+        return map_class_python3(cls, access_level)
     else:
-        return map_class_python2(cls)
+        return map_class_python2(cls, access_level)
 
 
 def map_function(fnc):
@@ -439,8 +486,7 @@ def map_function(fnc):
     ])
 
     # check name to determine if private function
-    if is_private(fnc.__name__):
-        fnc_dict["access"] = "PRIVATE"
+    fnc_dict["access"] = get_access(fnc.__name__)
 
     if inspect.isroutine(fnc):
         return fnc_dict
@@ -485,6 +531,10 @@ if __name__ == "__main__":
     parser.add_argument("--log", default="", help="Log file")
     parser.add_argument(
         "--depend", action="store_true", help="Draw dependencies")
+    parser.add_argument(
+        "--access", default=0, type=int,
+        help="Access level to track.  (0=public only, 2=include private"
+    )
     args = parser.parse_args()
 
     # set log level
@@ -494,7 +544,8 @@ if __name__ == "__main__":
         logger.parent.addHandler(logging.FileHandler(args.log, "a"))
 
     c_package = map_module(
-        importlib.import_module(args.module)
+        importlib.import_module(args.module),
+        access_level=args.access,
     )
 
     # ---------------------  draw class diagram  ----------------------------

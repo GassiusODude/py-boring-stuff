@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 from setuptools.extension import Extension
 #from Cython.Build import cythonize
 name = "py-boring-stuff"
-release = "1.0"
-version = "0.1"
+release = "0.2"
+version = "0.2"
 extensions = []
 
 setup(
