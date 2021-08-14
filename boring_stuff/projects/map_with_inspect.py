@@ -64,7 +64,6 @@ def map_module(mod):
     # inspect the module
     members = inspect.getmembers(mod)
 
-
     for member in members:
         try:
             # member is a tuple
@@ -73,7 +72,7 @@ def map_module(mod):
                 continue
 
             elif inspect.ismodule(member[1]):
-                # ----------------------  a module type  ------------------------
+                # --------------------  a module type  ----------------------
                 if member[1].__name__[:len(name)] == name:
                     # submodule
                     module_dict[member[1].__name__] = member[1]
@@ -152,7 +151,7 @@ def map_module(mod):
                     map_function(func_dict[c_method])
                 )
     except Exception as e:
-        logger.error("Exception caught in map_module(): %s"%str(e))
+        logger.error("Exception caught in map_module(): %s" % str(e))
 
     return c_package
 
@@ -389,7 +388,7 @@ def map_class_python2(cls):
             logger.error(
                 "Failed on member(%s) from class(%s)" %
                 (member[0], cls.__name__))
-            import pdb; pdb.set_trace()
+
     return cls_spec
 
 
