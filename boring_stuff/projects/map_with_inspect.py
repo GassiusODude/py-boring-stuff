@@ -48,7 +48,6 @@ def map_module(mod):
     c_package : dict
         The dictionary describing the package.
     """
-
     # ----------------------  initialize variables  -------------------------
     # extract name of the current module
     name = mod.__name__
@@ -65,50 +64,54 @@ def map_module(mod):
     # inspect the module
     members = inspect.getmembers(mod)
 
+
     for member in members:
-        # member is a tuple
-        if member[0][:2] == "__" and member[0][-2:] == "__":
-            # ignore 'private' members
-            continue
+        try:
+            # member is a tuple
+            if member[0][:2] == "__" and member[0][-2:] == "__":
+                # ignore 'private' members
+                continue
 
-        elif inspect.ismodule(member[1]):
-            # ----------------------  a module type  ------------------------
-            if member[1].__name__[:len(name)] == name:
-                # submodule
-                module_dict[member[1].__name__] = member[1]
-            else:
-                # external library...an import
-                dependency_list.append([name, member[1].__name__])
+            elif inspect.ismodule(member[1]):
+                # ----------------------  a module type  ------------------------
+                if member[1].__name__[:len(name)] == name:
+                    # submodule
+                    module_dict[member[1].__name__] = member[1]
+                else:
+                    # external library...an import
+                    dependency_list.append([name, member[1].__name__])
 
-        elif inspect.isfunction(member[1]):
-            if member[1].__module__ == name:
-                # member of this module
-                func_dict[member[0]] = member[1]
-            else:
-                # imported function
-                dependency_list.append([name, member[1].__name__])
+            elif inspect.isfunction(member[1]):
+                if member[1].__module__ == name:
+                    # member of this module
+                    func_dict[member[0]] = member[1]
+                else:
+                    # imported function
+                    dependency_list.append([name, member[1].__name__])
 
-        elif inspect.isclass(member[1]):
-            if member[1].__module__ == name:
-                # member of this module
-                class_dict[member[0]] = member[1]
+            elif inspect.isclass(member[1]):
+                if member[1].__module__ == name:
+                    # member of this module
+                    class_dict[member[0]] = member[1]
 
-            else:
-                # imported class
-                dependency_list.append([name, member[1].__name__])
-
-        else:
-            if is_private(member[0]):
-                c_access = "private"
+                else:
+                    # imported class
+                    dependency_list.append([name, member[1].__name__])
 
             else:
-                c_access = "public"
+                if is_private(member[0]):
+                    c_access = "private"
 
-            variable_list.append({
-                "name": member[0],
-                "type": type(member[1]),
-                "access": c_access
-            })
+                else:
+                    c_access = "public"
+
+                variable_list.append({
+                    "name": member[0],
+                    "type": type(member[1]),
+                    "access": c_access
+                })
+        except Exception as e:
+            logger.error("Exception in map_module() caught %s" % str(e))
 
     has_m = len(module_dict) > 0
     has_c = len(class_dict) > 0
@@ -116,37 +119,40 @@ def map_module(mod):
     has_v = len(variable_list) > 0
 
     c_package = {}
-    if has_m and not(any([has_c, has_f, has_v])):
-        # pure package
-        c_package = {
-            "type": "package",
-            "name": name,
-            "subpackages": [],
-            "modules": [],
-            "misc": [],
-            "dependencies": dependency_list
-        }
-        add_modules(c_package, module_dict)
+    try:
+        if has_m and not(any([has_c, has_f, has_v])):
+            # pure package
+            c_package = {
+                "type": "package",
+                "name": name,
+                "subpackages": [],
+                "modules": [],
+                "misc": [],
+                "dependencies": dependency_list
+            }
+            add_modules(c_package, module_dict)
 
-    else:
-        # module with some form of variable/function/class
-        c_package = {
-            "type": "module",
-            "name": name,
-            "subpackages": [],
-            "modules": [],
-            "class_list": [],
-            "methods": [],
-            "variables": variable_list,
-            "dependencies": dependency_list
-        }
-        add_modules(c_package, module_dict)
-        add_classes(c_package, class_dict)
+        else:
+            # module with some form of variable/function/class
+            c_package = {
+                "type": "module",
+                "name": name,
+                "subpackages": [],
+                "modules": [],
+                "class_list": [],
+                "methods": [],
+                "variables": variable_list,
+                "dependencies": dependency_list
+            }
+            add_modules(c_package, module_dict)
+            add_classes(c_package, class_dict)
 
-        for c_method in func_dict:
-            c_package["methods"].append(
-                map_function(func_dict[c_method])
-            )
+            for c_method in func_dict:
+                c_package["methods"].append(
+                    map_function(func_dict[c_method])
+                )
+    except Exception as e:
+        logger.error("Exception caught in map_module(): %s"%str(e))
 
     return c_package
 
@@ -207,9 +213,12 @@ def add_classes(c_package, class_dict):
         Function to map a class
     """
     for c_class in class_dict:
-        c_package["class_list"].append(
-            map_class(class_dict[c_class])
-        )
+        try:
+            c_package["class_list"].append(
+                map_class(class_dict[c_class])
+            )
+        except Exception as e:
+            logger.error("Exception caught in add_classes: %s" % str(e))
 
 
 def get_parent(cls):
@@ -268,38 +277,43 @@ def map_class_python3(cls):
     obj_fields = dir(object)
     ignore_fields = ["__class__", "__dict__", "__module__", "__weakref__"]
     for member in members:
-        if member[0] == "__init__":
-            cls_spec["methods"].append(map_function(member[1]))
+        try:
+            if member[0] == "__init__":
+                cls_spec["methods"].append(map_function(member[1]))
 
-        elif member[0] in obj_fields or member[0] in ignore_fields:
-            pass
+            elif member[0] in obj_fields or member[0] in ignore_fields:
+                pass
 
-        elif inspect.ismethod(member[1]):
-            # class method
-            cls_spec["classmethods"].append(map_function(member[1]))
+            elif inspect.ismethod(member[1]):
+                # class method
+                cls_spec["classmethods"].append(map_function(member[1]))
 
-        elif inspect.isfunction(member[1]):
-            # class method
-            c_func = map_function(member[1])
-            c_params = c_func["params"]
-            if len(c_params) > 0 and c_params[0] == "self":
-                cls_spec["methods"].append(c_func)
+            elif inspect.isfunction(member[1]):
+                # class method
+                c_func = map_function(member[1])
+                c_params = c_func["params"]
+                if len(c_params) > 0 and c_params[0] == "self":
+                    cls_spec["methods"].append(c_func)
 
+                else:
+                    cls_spec["staticmethods"].append(c_func)
+
+            elif inspect.isroutine(member[1]):
+                pass
             else:
-                cls_spec["staticmethods"].append(c_func)
-
-        elif inspect.isroutine(member[1]):
-            pass
-        else:
-            if is_private(member[0]):
-                c_access = "private"
-            else:
-                c_access = "public"
-            cls_spec["attributes"].append({
-                "name": member[0],
-                "type": type(member[1]),
-                "access": c_access,
-            })
+                if is_private(member[0]):
+                    c_access = "private"
+                else:
+                    c_access = "public"
+                cls_spec["attributes"].append({
+                    "name": member[0],
+                    "type": type(member[1]),
+                    "access": c_access,
+                })
+        except Exception as e:
+            logger.error(
+                "Exception in map_class_python3 for %s of class %s with %s" %
+                (member[0], cls.__name__, str(e)))
 
     return cls_spec
 
@@ -335,40 +349,47 @@ def map_class_python2(cls):
     members = inspect.getmembers(cls)
 
     for member in members:
-        if member[0] == "__init__":
-            cls_spec["methods"].append(map_function(member[1]))
+        try:
+            if member[0] == "__init__":
+                cls_spec["methods"].append(map_function(member[1]))
 
-        elif member[0] in obj_fields or member[0] in ignore_fields:
-            pass
+            elif member[0] in obj_fields or member[0] in ignore_fields:
+                pass
 
-        elif inspect.ismethod(member[1]):
-            c_func = map_function(member[1])
-            c_params = c_func["params"]
-            if len(c_params) > 0 and c_params[0] == "self":
-                cls_spec["methods"].append(c_func)
+            elif inspect.ismethod(member[1]):
+                c_func = map_function(member[1])
+                c_params = c_func["params"]
+                if len(c_params) > 0 and c_params[0] == "self":
+                    cls_spec["methods"].append(c_func)
+
+                else:
+                    cls_spec["classmethods"].append(c_func)
+
+            elif inspect.isfunction(member[1]):
+                # staticmethod
+                c_func = map_function(member[1])
+                cls_spec["staticmethods"].append(c_func)
+
+            elif inspect.isroutine(member[1]):
+                pass
 
             else:
-                cls_spec["classmethods"].append(c_func)
-
-        elif inspect.isfunction(member[1]):
-            # staticmethod
-            c_func = map_function(member[1])
-            cls_spec["staticmethods"].append(c_func)
-
-        elif inspect.isroutine(member[1]):
-            pass
-
-        else:
-            if is_private(member[0]):
-                c_access = "private"
-            else:
-                c_access = "public"
-            cls_spec["attributes"].append({
-                "name": member[0],
-                "type": type(member[1]),
-                "access": c_access,
-            })
-
+                if is_private(member[0]):
+                    c_access = "private"
+                else:
+                    c_access = "public"
+                cls_spec["attributes"].append({
+                    "name": member[0],
+                    "type": type(member[1]),
+                    "access": c_access,
+                })
+        except Exception as e:
+            logger.error(
+                "Exception caught in map_class_python2 with %s" % str(e))
+            logger.error(
+                "Failed on member(%s) from class(%s)" %
+                (member[0], cls.__name__))
+            import pdb; pdb.set_trace()
     return cls_spec
 
 
@@ -416,16 +437,25 @@ def map_function(fnc):
     if is_private(fnc.__name__):
         fnc_dict["access"] = "PRIVATE"
 
+    if inspect.isroutine(fnc):
+        return fnc_dict
+
     # use appropriate inspect method
     if sys.version_info.major == 3:
         # use getfullargspec, not available in Python2
-        func_spec = inspect.getfullargspec(fnc)
+        try:
+            func_spec = inspect.getfullargspec(fnc)
 
-        if func_spec.varargs:
-            fnc_dict["var_params"] = func_spec.varargs
-        if func_spec.varkw:
-            fnc_dict["varkw_params"] = func_spec.varkw
+            if func_spec.varargs:
+                fnc_dict["var_params"] = func_spec.varargs
+            if func_spec.varkw:
+                fnc_dict["varkw_params"] = func_spec.varkw
+        except TypeError as te:
+            logger.warning(
+                "Exception(%s) with inspect of function %s" %
+                (str(te), str(fnc.__func__.__qualname__)))
 
+            return fnc_dict
     else:
         # use available getargspec
         func_spec = inspect.getargspec(fnc)
