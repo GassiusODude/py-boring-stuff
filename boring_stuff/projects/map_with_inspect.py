@@ -1,74 +1,157 @@
+#!/usr/bin/env python
 from collections import OrderedDict
 import importlib
 import inspect
 from pprint import pprint
+import sys
 
-def map_module(mod):
-    """Map Module
+
+def is_private(name):
+    """Check if variable name infers that variable is private.
 
     Parameters
     ----------
-    mod : Python module
-        Module to map.
+    name : str
+        The name of the variable in question
+
+    Returns
+    -------
+    private : bool
+        True if it fits "__xxxxx__" format
+    """
+    assert isinstance(name, str), "Expecting name to be a string"
+    return len(name) > 4 and "__" == name[:2] and "__" == name[-2:]
+
+
+def map_module(mod):
+    """Map a module
+
+    Use inspect to map the following:
+
+    * package
+      * module
+        * class
+          * methods
+          * variables
+        * variables
+        * functions
+
+    Parameters
+    ----------
+    mod : module
+        The module to be examined.
 
     Returns
     -------
     c_package : dict
-        Dictionary describing the interconnecting classes and packages
+        The dictionary describing the package.
     """
-    # scan for submodules
-    mod_dict = dict(inspect.getmembers(mod, inspect.ismodule))
+    # ----------------------  initialize variables  -------------------------
+    # extract name of the current module
+    name = mod.__name__
 
-    # scan for classes
-    class_dict = dict(inspect.getmembers(mod, inspect.isclass))
+    # initialize variables
+    module_dict = {}
+    class_dict = {}
+    func_dict = {}
+    dependencies_dict = {}
+    variable_dict = {}
 
-    # scan for functions
-    method_dict = dict(inspect.getmembers(mod, inspect.isfunction))
+    # ----------------------  inspect current  ------------------------------
+    # inspect the module
+    members = inspect.getmembers(mod, inspect.modulesbyfile)
 
-    if len(class_dict) > 0 or len(method_dict) > 0:
-        c_package = OrderedDict([
-            ["type", "module"],
-            ["name", mod.__name__],
-            ["class_list", []],         #
-            ["methods", []],            # methods not in a class
-        ])
+    for member in members:
+        # member is a tuple
+        if member[0][:2] == "__" and member[0][-2:] == "__":
+            # ignore 'private' members
+            continue
 
-        for c_class in class_dict:
+        elif inspect.ismodule(member[1]):
+            # ----------------------  a module type  ------------------------
+            if member[1].__name__[:len(name)] == name:
+                # submodule
+                module_dict[member[1].__name__] = member[1]
+            else:
+                # external library...an import
+                dependencies_dict[member[1].__name__] = member[1]
 
-            if mod.__name__ in class_dict[c_class].__module__:
-                c_package["class_list"].append(
-                    map_class(class_dict[c_class])
-                )
+        elif inspect.isfunction(member[1]):
+            if member[1].__module__ == name:
+                # member of this module
+                func_dict[member[0]] = member[1]
+            else:
+                # imported function
+                dependencies_dict[member[1].__module__] = \
+                    inspect.getmodule(member[1])
 
-        for c_method in method_dict:
+        elif inspect.isclass(member[1]):
+            if member[1].__module__ == name:
+                # member of this module
+                class_dict[member[0]] = member[1]
+            else:
+                # imported class
+                dependencies_dict[member[1].__module__] = \
+                    inspect.getmodule(member[1])
+        else:
+            variable_dict[member[0]] = type(member[1])
+
+    has_m = len(module_dict) > 0
+    has_c = len(class_dict) > 0
+    has_f = len(func_dict) > 0
+    has_v = len(variable_dict) > 0
+
+    c_package = {}
+    if has_m and not(any([has_c, has_f, has_v])):
+        # pure package
+        c_package = {
+            "type": "package",
+            "name": name,
+            "subpackages": [],
+            "modules": [],
+            "misc": [],
+        }
+        add_modules(c_package, module_dict)
+    else:
+        # module with some form of variable/function/class
+        c_package = {
+            "type": "module",
+            "name": name,
+            "subpackages": [],
+            "class_list": [],
+            "methods": [],
+            "variables": []
+        }
+        add_modules(c_package, module_dict)
+        add_classes(c_package, class_dict)
+
+        for c_method in func_dict:
             c_package["methods"].append(
-                map_function(method_dict[c_method])
+                map_function(func_dict[c_method])
             )
 
-    #elif mod_dict:
-    else:
-        c_package = OrderedDict([
-            ["type", "package"],
-            ["name", mod.__name__],
-            ["subpackages", []],
-            ["modules", []],
-            ["misc", []],
-        ])
-        for c_mod in mod_dict:
-            try:
-                if mod_dict[c_mod].__package__ is None or \
-                    mod.__name__ in mod_dict[c_mod].__package__:
-                    tmp_mod = map_module(mod_dict[c_mod])
-                    if tmp_mod["type"] == "package":
-                        c_package["subpackages"].append(tmp_mod)
-                    else:
-                        c_package["modules"].append(tmp_mod)
-
-            except Exception as e:
-                print("Caught exception: %s"%str(e))
-
-
     return c_package
+
+
+def add_modules(c_package, mod_dict):
+    for c_mod in mod_dict:
+        try:
+            tmp_mod = map_module(mod_dict[c_mod])
+            if tmp_mod["type"] == "package":
+                c_package["subpackages"].append(tmp_mod)
+            else:
+                c_package["modules"].append(tmp_mod)
+
+        except Exception as e:
+            print("Caught exception: %s" % str(e))
+
+
+def add_classes(c_package, class_dict):
+    for c_class in class_dict:
+        c_package["class_list"].append(
+            map_class(class_dict[c_class])
+        )
+
 
 def map_class(cls):
     """Map a class
@@ -96,32 +179,64 @@ def map_class(cls):
 
     # -------------------------  identify parent class  ---------------------
     try:
-        parent = cls.__bases__[0].__name__
-        print("Parent of %s is %s"%(str(cls), str(parent)))
+        if len(cls.__bases__) == 0:
+            parent = None
+        else:
+            parent = [i.__name__ for i in cls.__bases__]
 
-    except:
+    except Exception as e:
         parent = None
+        print(e)
+        import pdb; pdb.set_trace()
 
     # --------------------------  initialize class spec  --------------------
     cls_spec = OrderedDict([
-        ["type","class"],
+        ["type", "class"],
         ["name", cls.__name__],
         ["parent", parent],
-        ["attributes", []],#FIXME: how to identify attributes?
+        ["attributes", []],  # FIXME: how to identify attributes?
         ["methods", method_list],
         ["functions", func_list],
     ])
     return cls_spec
 
+
 def map_function(fnc):
-    func_spec = inspect.getargspec(fnc)
-    fnc = OrderedDict([
+    # initialize output
+    fnc_dict = OrderedDict([
         ["type", "function"],
         ["name", fnc.__name__],
         ["access", "PUBLIC"],
-        ["params", func_spec.args],
+        ["params", []],
     ])
-    return fnc
+
+    # check name to determine if private function
+    if is_private(fnc.__name__):
+        fnc_dict["access"] = "PRIVATE"
+
+    # use appropriate inspect method
+    if sys.version_info.major == 3:
+        # use getfullargspec, not available in Python2
+        func_spec = inspect.getfullargspec(fnc)
+
+        if func_spec.varargs:
+            fnc_dict["var_params"] = func_spec.varargs
+        if func_spec.varkw:
+            fnc_dict["varkw_params"] = func_spec.varkw
+
+    else:
+        # use available getargspec
+        func_spec = inspect.getargspec(fnc)
+        if func_spec.varargs:
+            fnc_dict["var_params"] = func_spec.varargs
+        if func_spec.keywords:
+            fnc_dict["varkw_params"] = func_spec.keywords
+
+    fnc_dict["params"] = func_spec.args
+
+
+    return fnc_dict
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -135,5 +250,6 @@ if __name__ == "__main__":
     )
     pprint(c_package)
 
+    # ---------------------  draw class diagram  ----------------------------
     from boring_stuff.uml.class_diagram import write_class_diagram
     write_class_diagram(c_package, output=args.output)
