@@ -233,8 +233,6 @@ def map_function(fnc):
             fnc_dict["varkw_params"] = func_spec.keywords
 
     fnc_dict["params"] = func_spec.args
-
-
     return fnc_dict
 
 
