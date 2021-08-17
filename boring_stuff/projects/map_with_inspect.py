@@ -59,7 +59,7 @@ def map_module(mod):
 
     # ----------------------  inspect current  ------------------------------
     # inspect the module
-    members = inspect.getmembers(mod, inspect.modulesbyfile)
+    members = inspect.getmembers(mod)
 
     for member in members:
         # member is a tuple
@@ -112,6 +112,7 @@ def map_module(mod):
             "misc": [],
         }
         add_modules(c_package, module_dict)
+
     else:
         # module with some form of variable/function/class
         c_package = {
@@ -134,6 +135,24 @@ def map_module(mod):
 
 
 def add_modules(c_package, mod_dict):
+    """Add modules to c_package
+
+    This uses map_module to dive deeper into detected moddules.
+    If the module only has references to other modules, it is
+    labeled as a "package".  Otherwise it is a 'module' with
+    variables, functions, and/or classes.
+
+    Parameters
+    ----------
+    c_package : dict
+        The current package from map_module.
+        .. note:: This parameter is update by this function
+
+    See Also
+    --------
+    map_module :
+        Function to map a module.
+    """
     for c_mod in mod_dict:
         try:
             tmp_mod = map_module(mod_dict[c_mod])
@@ -147,6 +166,27 @@ def add_modules(c_package, mod_dict):
 
 
 def add_classes(c_package, class_dict):
+    """Add details about classes
+
+    This function dives deeper into the package to
+    update the list of classes.
+
+    Parameters
+    ----------
+    c_package : dict
+        The current package from map_module.
+
+    class_dict : dict
+        The classes found in map_module
+
+    See Also
+    ---------
+    map_module :
+        Function that calls this function
+
+    map_class :
+        Function to map a class
+    """
     for c_class in class_dict:
         c_package["class_list"].append(
             map_class(class_dict[c_class])
@@ -187,7 +227,6 @@ def map_class(cls):
     except Exception as e:
         parent = None
         print(e)
-        import pdb; pdb.set_trace()
 
     # --------------------------  initialize class spec  --------------------
     cls_spec = OrderedDict([

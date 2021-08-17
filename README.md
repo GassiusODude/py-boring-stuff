@@ -18,6 +18,7 @@ python3 setup.py install --user
 ~~~
 
 ## Documentation
+
 Documentation can be generated using the setup.py
 
 ~~~bash
@@ -25,6 +26,7 @@ $ python3 setup.py build_sphinx
 ~~~
 
 ### Update Sphinx
+
 When adding modules or adding new files, the .rst files in the docs folder need to be updated.
 
 ~~~bash
@@ -36,6 +38,7 @@ $ sphinx-apidoc -o docs/source/ boring_stuff -f
 ~~~
 
 ## Test
+
 Tests are stored in the "test" folder.  It can be run using the following comand.
 
 ~~~bash
