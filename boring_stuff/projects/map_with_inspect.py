@@ -2,8 +2,10 @@
 from collections import OrderedDict
 import importlib
 import inspect
-from pprint import pprint
+import logging
 import sys
+
+logger = logging.getLogger("boring_stuff.projects.map_with_inspect")
 
 
 def is_private(name):
@@ -46,9 +48,11 @@ def map_module(mod):
     c_package : dict
         The dictionary describing the package.
     """
+
     # ----------------------  initialize variables  -------------------------
     # extract name of the current module
     name = mod.__name__
+    logger.info("Running map_module(%s)" % name)
 
     # initialize variables
     module_dict = {}
@@ -172,7 +176,7 @@ def add_modules(c_package, mod_dict):
                 c_package["modules"].append(tmp_mod)
 
         except Exception as e:
-            print("Caught exception: %s" % str(e))
+            logger.error("Caught exception in add_modules(): %s" % str(e))
 
 
 def add_classes(c_package, class_dict):
@@ -225,7 +229,7 @@ def get_parent(cls):
 
     except Exception as e:
         parent = None
-        print(e)
+        logger.error("Error caught in get_parent(), %s" % str(e))
     return parent
 
 
@@ -434,12 +438,22 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("module")
     parser.add_argument("--output", default="/tmp/output.plantuml")
+    parser.add_argument(
+        "--level", default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="The log level")
+    parser.add_argument("--log", default="", help="Log file")
     args = parser.parse_args()
+
+    # set log level
+    logger.parent.setLevel(args.level)
+
+    if args.log:
+        logger.parent.addHandler(logging.FileHandler(args.log, "a"))
 
     c_package = map_module(
         importlib.import_module(args.module)
     )
-    pprint(c_package, indent=1)
 
     # ---------------------  draw class diagram  ----------------------------
     from boring_stuff.uml.class_diagram import write_class_diagram
