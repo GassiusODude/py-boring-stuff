@@ -55,7 +55,7 @@ def map_module(mod):
     class_dict = {}
     func_dict = {}
     dependencies_dict = {}
-    variable_dict = {}
+    variable_list = []
 
     # ----------------------  inspect current  ------------------------------
     # inspect the module
@@ -94,12 +94,20 @@ def map_module(mod):
                 dependencies_dict[member[1].__module__] = \
                     inspect.getmodule(member[1])
         else:
-            variable_dict[member[0]] = type(member[1])
+            if is_private(member[0]):
+                c_access = "private"
+            else:
+                c_access = "public"
+                variable_list.append({
+                    "name": member[0],
+                    "type": type(member[1]),
+                    "access": c_access
+                })
 
     has_m = len(module_dict) > 0
     has_c = len(class_dict) > 0
     has_f = len(func_dict) > 0
-    has_v = len(variable_dict) > 0
+    has_v = len(variable_list) > 0
 
     c_package = {}
     if has_m and not(any([has_c, has_f, has_v])):
@@ -110,6 +118,7 @@ def map_module(mod):
             "subpackages": [],
             "modules": [],
             "misc": [],
+            "dependencies": dependencies_dict
         }
         add_modules(c_package, module_dict)
 
@@ -121,7 +130,8 @@ def map_module(mod):
             "subpackages": [],
             "class_list": [],
             "methods": [],
-            "variables": []
+            "variables": variable_list,
+            "dependencies": dependencies_dict
         }
         add_modules(c_package, module_dict)
         add_classes(c_package, class_dict)
@@ -193,6 +203,166 @@ def add_classes(c_package, class_dict):
         )
 
 
+def get_parent(cls):
+    """Get the parent of the class
+
+    Parameters
+    ----------
+    cls : class
+        The class being analyzed
+
+    Returns
+    -------
+    parent : None, list, class
+        The parent can be None.
+        It can be a list of classes or a single class
+    """
+    try:
+        if len(cls.__bases__) == 0:
+            parent = None
+        else:
+            parent = [i.__name__ for i in cls.__bases__]
+
+    except Exception as e:
+        parent = None
+        print(e)
+    return parent
+
+
+def map_class_python3(cls):
+    """Map class with Python3
+
+    Parameters
+    ----------
+    cls : class
+        The class being analyzed
+
+    Returns
+    -------
+    class_spec : dict
+        Dictionary describing the parent, attributes, methods,
+        staticmethods, and classmethods
+    """
+    cls_spec = {
+        "type": "class",
+        "name": cls.__name__,
+        "parent": get_parent(cls),
+        "attributes": [],
+        "classmethods": [],
+        "staticmethods": [],
+        "methods": [],
+    }
+    # get members of the class
+    members = inspect.getmembers(cls)
+
+    # prepate list of members to ignore
+    obj_fields = dir(object)
+    ignore_fields = ["__class__", "__dict__", "__module__", "__weakref__"]
+    for member in members:
+        if member[0] == "__init__":
+            cls_spec["methods"].append(map_function(member[1]))
+
+        elif member[0] in obj_fields or member[0] in ignore_fields:
+            pass
+
+        elif inspect.ismethod(member[1]):
+            # class method
+            cls_spec["classmethods"].append(map_function(member[1]))
+
+        elif inspect.isfunction(member[1]):
+            # class method
+            c_func = map_function(member[1])
+            c_params = c_func["params"]
+            if len(c_params) > 0 and c_params[0] == "self":
+                cls_spec["methods"].append(c_func)
+
+            else:
+                cls_spec["staticmethods"].append(c_func)
+
+        elif inspect.isroutine(member[1]):
+            pass
+        else:
+            if is_private(member[0]):
+                c_access = "private"
+            else:
+                c_access = "public"
+            cls_spec["attributes"].append({
+                "name": member[0],
+                "type": type(member[1]),
+                "access": c_access,
+            })
+
+    return cls_spec
+
+
+def map_class_python2(cls):
+    """Map class with Python2
+
+    Parameters
+    ----------
+    cls : class
+        The class being analyzed
+
+    Returns
+    -------
+    class_spec : dict
+        Dictionary describing the parent, attributes, methods,
+        staticmethods, and classmethods
+    """
+    cls_spec = {
+        "type": "class",
+        "name": cls.__name__,
+        "parent": get_parent(cls),
+        "attributes": [],
+        "classmethods": [],
+        "staticmethods": [],
+        "methods": [],
+    }
+    # prepare list of things to ignore
+    obj_fields = dir(object)
+    ignore_fields = ["__class__", "__dict__", "__module__", "__weakref__"]
+
+    # get members of the class
+    members = inspect.getmembers(cls)
+
+    for member in members:
+        if member[0] == "__init__":
+            cls_spec["methods"].append(map_function(member[1]))
+
+        elif member[0] in obj_fields or member[0] in ignore_fields:
+            pass
+
+        elif inspect.ismethod(member[1]):
+            c_func = map_function(member[1])
+            c_params = c_func["params"]
+            if len(c_params) > 0 and c_params[0] == "self":
+                cls_spec["methods"].append(c_func)
+
+            else:
+                cls_spec["classmethods"].append(c_func)
+
+        elif inspect.isfunction(member[1]):
+            # staticmethod
+            c_func = map_function(member[1])
+            cls_spec["staticmethods"].append(c_func)
+
+        elif inspect.isroutine(member[1]):
+            pass
+
+        else:
+            if is_private(member[0]):
+                c_access = "private"
+            else:
+                c_access = "public"
+            cls_spec["attributes"].append({
+                "name": member[0],
+                "type": type(member[1]),
+                "access": c_access,
+            })
+
+    return cls_spec
+
+
 def map_class(cls):
     """Map a class
 
@@ -204,43 +374,27 @@ def map_class(cls):
     cls : class
         The class to map.
     """
-    # ------------------------  get class methods  --------------------------
-    methods = dict(inspect.getmembers(cls, inspect.ismethod))
-    method_list = []
-    for method in methods:
-        method_list.append(map_function(methods[method]))
-
-    # ---------------------  get class function  ----------------------------
-    # NOTE: this should include classmethod and staticmethods
-    funcs = dict(inspect.getmembers(cls, inspect.isfunction))
-    func_list = []
-    for func in funcs:
-        func_list.append(map_function(funcs[func]))
-
-    # -------------------------  identify parent class  ---------------------
-    try:
-        if len(cls.__bases__) == 0:
-            parent = None
-        else:
-            parent = [i.__name__ for i in cls.__bases__]
-
-    except Exception as e:
-        parent = None
-        print(e)
-
-    # --------------------------  initialize class spec  --------------------
-    cls_spec = OrderedDict([
-        ["type", "class"],
-        ["name", cls.__name__],
-        ["parent", parent],
-        ["attributes", []],  # FIXME: how to identify attributes?
-        ["methods", method_list],
-        ["functions", func_list],
-    ])
-    return cls_spec
+    if sys.version_info.major == 3:
+        return map_class_python3(cls)
+    else:
+        return map_class_python2(cls)
 
 
 def map_function(fnc):
+    """Map the function
+
+    Identify the input parameters and access
+
+    Parameters
+    ----------
+    fnc : function
+        The function being analyzed
+
+    Returns
+    -------
+    fnc_dict : dict
+        The dictionary describing the function
+    """
     # initialize output
     fnc_dict = OrderedDict([
         ["type", "function"],
@@ -285,7 +439,7 @@ if __name__ == "__main__":
     c_package = map_module(
         importlib.import_module(args.module)
     )
-    pprint(c_package)
+    pprint(c_package, indent=1)
 
     # ---------------------  draw class diagram  ----------------------------
     from boring_stuff.uml.class_diagram import write_class_diagram
