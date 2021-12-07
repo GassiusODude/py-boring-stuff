@@ -385,7 +385,6 @@ def map_class_python2(cls, access_level=0):
 
     # get members of the class
     members = inspect.getmembers(cls)
-
     for member in members:
         try:
             c_access = get_access(member[0])
@@ -487,10 +486,9 @@ def map_function(fnc):
 
     # check name to determine if private function
     fnc_dict["access"] = get_access(fnc.__name__)
-
-    if inspect.isroutine(fnc):
-        return fnc_dict
-
+#    if inspect.isroutine(fnc):
+#        return fnc_dict
+    
     # use appropriate inspect method
     if sys.version_info.major == 3:
         # use getfullargspec, not available in Python2
@@ -506,7 +504,7 @@ def map_function(fnc):
                 "Exception(%s) with inspect of function %s" %
                 (str(te), str(fnc.__func__.__qualname__)))
 
-            return fnc_dict
+#            return fnc_dict
     else:
         # use available getargspec
         func_spec = inspect.getargspec(fnc)

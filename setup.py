@@ -3,7 +3,7 @@ from setuptools.extension import Extension
 #from Cython.Build import cythonize
 name = "py-boring-stuff"
 release = "0.2"
-version = "0.2"
+version = "0.2.1"
 extensions = []
 
 setup(
@@ -17,7 +17,7 @@ setup(
     tests_require=["pytest"],
     setup_requires=[],
     install_requires=[
-        #private repo
+        "numpy",
         ],
     dependency_links=[
       #'git+ssh://git@github.com/username/private_repo.git#egg=private_package_name-1.1',
