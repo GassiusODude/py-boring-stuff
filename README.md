@@ -52,3 +52,6 @@ $ python3 -m pytest test
 ## Use Cases
 
 1. [Map Library and Create Class Diagram](docs/map_and_class_diagram.md)
+
+<img src="docs/bs.svg" alt="Boring Stuff Class Diagram"
+style="float: left; marg-in-right: 10px;">
